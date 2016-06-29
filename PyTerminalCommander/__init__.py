@@ -113,6 +113,7 @@ class ListView(FocusMixin, urwid.ListBox):
         self.max_size = max_size
         self._lock = threading.Lock()
         self._line_counter = 0
+        self.show_line_num = show_line_num
 
     def add(self, line):
         self._line_counter += 1
@@ -120,11 +121,14 @@ class ListView(FocusMixin, urwid.ListBox):
             was_on_end = self.get_focus()[1] == len(self.body) - 1
             if self.max_size and len(self.body) > self.max_size:
                 del self.body[0]
-            self.body.append(urwid.Text(line))
+            if self.show_line_num:
+                line = urwid.Columns([(4, urwid.Text(str(self._line_counter))),  urwid.Text(line)])
+            else:
+                line = urwid.Text(line)
+            self.body.append(line)
             last = len(self.body) - 1
             if was_on_end:
                 self.set_focus(last, 'above')
-
 
 class Input(FocusMixin, urwid.Edit):
 
