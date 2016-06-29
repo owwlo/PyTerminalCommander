@@ -34,10 +34,20 @@ if __name__=='__main__':
         def do_quit(self, *args):
             return Commander.Exit
 
+        def do_yellow(self, commander, extra):
+            return (extra, "yellow")
+
+        def do_green(self, commander, extra):
+            return (extra, "light_green")
+
     c = Commander('This is the title of the frame'
         , cmd_cb = CommandSet()
-        , hook_stdout=True
-        , hook_stderr=True
-        , show_help_on_start=True
+        , hook_stdout = True
+        , hook_stderr = True
+        , show_help_on_start = True
+        , show_line_num = True
+        , extra_pallete = [
+            ('light_green', urwid.LIGHT_GREEN, urwid.BLACK),
+        ]
     )
     c.loop()

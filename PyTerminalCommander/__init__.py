@@ -84,16 +84,18 @@ class CommandHandler(object):
             res += 'Available commands: %s' % ', '.join(sorted(cl))
             return res
 
+        r = None
         if not cmd:
-            return std_help()
+            r = std_help()
         else:
             try:
                 fn = getattr(self, 'do_' + cmd)
                 doc = fn.__doc__
-                return doc or 'No documentation available for %s' % cmd
+                r = doc or 'No documentation available for %s' % cmd
             except AttributeError:
-                return std_help()
+                r = std_help()
 
+        return (r, "yellow")
 
 class FocusMixin(object):
 
@@ -105,13 +107,15 @@ class FocusMixin(object):
 
 class ListView(FocusMixin, urwid.ListBox):
 
-    def __init__( self, model, got_focus, max_size=None ):
+    def __init__( self, model, got_focus, max_size = None, show_line_num = False ):
         urwid.ListBox.__init__(self, model)
         self._got_focus = got_focus
         self.max_size = max_size
         self._lock = threading.Lock()
+        self._line_counter = 0
 
     def add(self, line):
+        self._line_counter += 1
         with self._lock:
             was_on_end = self.get_focus()[1] == len(self.body) - 1
             if self.max_size and len(self.body) > self.max_size:
@@ -170,16 +174,16 @@ class Commander(urwid.Frame):
         ('active_title', urwid.BLACK, urwid.DARK_BLUE if _platform == "darwin" else urwid.WHITE),
         ('normal', urwid.LIGHT_GRAY, urwid.BLACK),
         ('error', urwid.LIGHT_RED, urwid.BLACK),
-        ('green', urwid.DARK_GREEN, urwid.BLACK),
-        ('blue', urwid.LIGHT_BLUE, urwid.LIGHT_BLUE),
-        ('magenta', urwid.DARK_MAGENTA, urwid.BLACK),
+        ('yellow', urwid.YELLOW, urwid.BLACK),
         ]
 
     def __init__( self, title, command_caption=DEFAULT_COMMAND_CAPTION
         , cmd_cb=None
         , max_size=2048
         , show_help_on_start=False
-        , hook_stdout=False, hook_stderr=False ):
+        , hook_stdout=False, hook_stderr=False
+        , extra_pallete = None
+        , show_line_num = False ):
         self._show_help_on_start = show_help_on_start
         self._hook_stdout = hook_stdout
         self._hook_stderr = hook_stderr
@@ -190,7 +194,7 @@ class Commander(urwid.Frame):
         self.model = urwid.SimpleListWalker([])
         self.body = ListView(self.model, lambda : \
                              self._update_focus(False),
-                             max_size=max_size)
+                             max_size=max_size, show_line_num = show_line_num)
         self.input = Input(lambda : self._update_focus(True))
         foot = urwid.Pile([self.foot, urwid.AttrMap(self.input, 'normal')])
         urwid.Frame.__init__(self, urwid.AttrWrap(self.body, 'normal'),
@@ -200,8 +204,12 @@ class Commander(urwid.Frame):
         urwid.connect_signal(self.input, 'line_entered',
                              self.on_line_entered)
         self._cmd = cmd_cb
-        self._output_styles = [s[0] for s in self.PALLETE]
         self.eloop = None
+
+        if extra_pallete:
+            self.PALLETE.extend(extra_pallete)
+
+        self._output_styles = [s[0] for s in self.PALLETE]
 
     def loop(self, handle_mouse=False):
         self.eloop = urwid.MainLoop(self, self.PALLETE,
@@ -209,7 +217,7 @@ class Commander(urwid.Frame):
         self._eloop_thread = threading.current_thread()
 
         if self._show_help_on_start:
-            self.eloop.set_alarm_in(0., lambda x, y: self.output(self._cmd.help(None)))
+            self.eloop.set_alarm_in(0., lambda x, y: self.output(*self._cmd.help(None)))
 
         self._hookToStdOutput(hookToStdOut = self._hook_stdout, hookToStdErr = self._hook_stderr)
 
@@ -226,7 +234,10 @@ class Commander(urwid.Frame):
             if res == Commander.Exit:
                 raise urwid.ExitMainLoop()
             elif res:
-                self.output(str(res))
+                if isinstance(res, tuple):
+                    self.output(str(res[0]), style = res[1])
+                else:
+                    self.output(str(res))
         else:
             if line in ('q', 'quit', 'exit'):
                 raise urwid.ExitMainLoop()
