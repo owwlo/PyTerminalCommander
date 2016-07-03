@@ -40,11 +40,30 @@ from collections import deque
 from threading import Thread
 from sys import platform as _platform
 
+import urwid.curses_display
+import urwid.raw_display
+import urwid.web_display
+
 import urwid
 import threading
 import sys
 import os
 import traceback
+
+if urwid.web_display.is_web_request():
+    Screen = urwid.web_display.Screen
+else:
+    Screen = urwid.raw_display.Screen
+
+class PopUpDialog(urwid.WidgetWrap):
+    def __init__(self, input_handler, text):
+        pile = urwid.Pile([urwid.Text(text, align='center')])
+        fill = urwid.Filler(pile)
+        self.__super.__init__(urwid.AttrWrap(fill, 'popup'))
+        self.input_handler = input_handler
+
+    def keypress(self, size, key):
+        return self.input_handler.keypress(size, key)
 
 class CommandHandler(object):
 
@@ -68,7 +87,7 @@ class CommandHandler(object):
             return getattr(self, 'do_' + cmd)(commander,
                     (extras[1] if len(extras) > 1 else None))
         else:
-            sys.stderr.write('Uknown command: %s' % cmd)
+            commander.output('Unknown command: %s' % cmd, 'error')
 
     def help(self, cmd=None):
 
@@ -95,7 +114,7 @@ class CommandHandler(object):
             except AttributeError:
                 r = std_help()
 
-        return (r, "yellow")
+        return (r, "help_text")
 
 class FocusMixin(object):
 
@@ -165,6 +184,37 @@ class Input(FocusMixin, urwid.Edit):
         else:
             urwid.Edit.keypress(self, size, key)
 
+class CommanderPopupLauncher(urwid.PopUpLauncher):
+    WIDTH = 60
+    HEIGHT = 3
+
+    DEFAULT_DURATION = 3
+
+    def __init__(self, widget, commander):
+        self.__super.__init__(widget)
+        self.commander = commander
+        self.duration = CommanderPopupLauncher.DEFAULT_DURATION
+
+    def notify(self, text, duration):
+        self.duration = duration
+        self.pop_up = PopUpDialog(self.commander, text)
+        self.open_pop_up()
+
+    def create_pop_up(self):
+        # Setup timeout timer
+        self.commander.eloop.set_alarm_in(self.duration, lambda x, y: self.close_pop_up())
+
+        return self.pop_up
+
+    def get_pop_up_parameters(self):
+        screen = Screen()
+        width, height = screen.get_cols_rows()
+        return {
+            'left': int((width - CommanderPopupLauncher.WIDTH) / 2),
+            'top': int((height - CommanderPopupLauncher.HEIGHT) / 2),
+            'overlay_width': CommanderPopupLauncher.WIDTH,
+            'overlay_height': CommanderPopupLauncher.HEIGHT
+        }
 
 class Commander(urwid.Frame):
 
@@ -175,11 +225,12 @@ class Commander(urwid.Frame):
 
     PALLETE = [
         ('inactive_title', urwid.BLACK, urwid.LIGHT_GRAY),
-        ('active_title', urwid.BLACK, urwid.DARK_BLUE if _platform == "darwin" else urwid.WHITE),
+        ('active_title', urwid.WHITE, urwid.DARK_BLUE),
         ('normal', urwid.LIGHT_GRAY, urwid.BLACK),
         ('error', urwid.LIGHT_RED, urwid.BLACK),
-        ('yellow', urwid.YELLOW, urwid.BLACK),
-        ]
+        ('help_text', urwid.YELLOW, urwid.BLACK),
+        ('popup', urwid.WHITE, urwid.DARK_BLUE),
+    ]
 
     def __init__( self, title, command_caption=DEFAULT_COMMAND_CAPTION
         , cmd_cb=None
@@ -196,13 +247,15 @@ class Commander(urwid.Frame):
         self.foot = urwid.AttrMap(urwid.Text(command_caption), 'active_title')
 
         self.model = urwid.SimpleListWalker([])
-        self.body = ListView(self.model, lambda : \
+        self.inner = ListView(self.model, lambda : \
                              self._update_focus(False),
                              max_size=max_size, show_line_num = show_line_num)
+        self.popup_launcher = CommanderPopupLauncher(self.inner, self)
         self.input = Input(lambda : self._update_focus(True))
         foot = urwid.Pile([self.foot, urwid.AttrMap(self.input, 'normal')])
-        urwid.Frame.__init__(self, urwid.AttrWrap(self.body, 'normal'),
-                             self.header, foot)
+
+        urwid.Frame.__init__(self, urwid.AttrWrap(self.popup_launcher, 'normal'), header = self.header, footer = foot)
+
         self.set_focus_path(['footer', 1])
         self._focus = True
         urwid.connect_signal(self.input, 'line_entered',
@@ -216,8 +269,7 @@ class Commander(urwid.Frame):
         self._output_styles = [s[0] for s in self.PALLETE]
 
     def loop(self, handle_mouse=False):
-        self.eloop = urwid.MainLoop(self, self.PALLETE,
-                                    handle_mouse=handle_mouse)
+        self.eloop = urwid.MainLoop(self, self.PALLETE, handle_mouse=handle_mouse, pop_ups=True)
         self._eloop_thread = threading.current_thread()
 
         if self._show_help_on_start:
@@ -251,7 +303,7 @@ class Commander(urwid.Frame):
     def output(self, line, style=None):
         if style and style in self._output_styles:
             line = (style, line)
-        self.body.add(line)
+        self.inner.add(line)
 
         # since output could be called asynchronously form other threads we need to refresh screen in these cases
 
@@ -292,6 +344,9 @@ class Commander(urwid.Frame):
             self._focus = True
             self.header.set_attr_map({None: 'inactive_title'})
             self.foot.set_attr_map({None: 'active_title'})
+
+    def notify(self, txt, duration = CommanderPopupLauncher.DEFAULT_DURATION):
+        self.popup_launcher.notify(txt, duration)
 
     def keypress(self, size, key):
         if key == 'tab':
