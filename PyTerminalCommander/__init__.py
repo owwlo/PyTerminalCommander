@@ -283,7 +283,7 @@ class Commander(urwid.Frame):
         if self._cmd:
             try:
                 res = self._cmd(self, line)
-            except Exception, e:
+            except Exception as e:
                 traceback.print_exc()
                 self.output('Error: %s' % e, 'error')
                 return
