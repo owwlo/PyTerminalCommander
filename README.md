@@ -9,14 +9,21 @@ A Python library to provide a divided GUI layout in terminal as an easy way to b
 - Simple interface for easily integrating with any script
 - Customizable theme, overwritable palette
 
-## Screenshots
-TODO
+## Demo
+
+[![asciicast](https://asciinema.org/a/79219.png)](https://asciinema.org/a/79219?t=8)
 
 ## Installation
-TODO
+
+Install from pip:
+
+```sh
+$ sudo pip install PyTerminalCommander
+```
 
 ## Usage & Configuration
-TODO
+
+Please refer to the example.py
 
 ## Special Thanks
 
