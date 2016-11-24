@@ -81,7 +81,8 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-        'urwid>=1.3.1'
+        'urwid>=1.3.1',
+        'six>=1.10.0'
     ],
 
     # To provide executable scripts, use entry points in preference to the

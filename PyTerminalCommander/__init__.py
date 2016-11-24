@@ -49,11 +49,14 @@ import threading
 import sys
 import os
 import traceback
+import six
 
 if urwid.web_display.is_web_request():
     Screen = urwid.web_display.Screen
 else:
     Screen = urwid.raw_display.Screen
+
+urwid.set_encoding("utf-8")
 
 class PopUpDialog(urwid.WidgetWrap):
     def __init__(self, input_handler, text):
@@ -126,15 +129,21 @@ class FocusMixin(object):
 
 class ListView(FocusMixin, urwid.ListBox):
 
-    def __init__( self, model, got_focus, max_size = None, show_line_num = False ):
+    def __init__( self, model, got_focus, max_size = None, show_line_num = False, tab_spaces = 4 ):
         urwid.ListBox.__init__(self, model)
         self._got_focus = got_focus
         self.max_size = max_size
         self._lock = threading.Lock()
         self._line_counter = 0
         self.show_line_num = show_line_num
+        self.tab_spaces = tab_spaces
 
     def add(self, line):
+        if isinstance(line, six.string_types):
+            line = line.replace("\t", " " * self.tab_spaces)
+        elif isinstance(line, tuple):
+            line = (line[0], line[1].replace("\t", " " * self.tab_spaces))
+
         self._line_counter += 1
         with self._lock:
             was_on_end = self.get_focus()[1] == len(self.body) - 1
@@ -154,7 +163,7 @@ class Input(FocusMixin, urwid.Edit):
     signals = ['line_entered']
 
     def __init__(self, got_focus=None):
-        urwid.Edit.__init__(self)
+        urwid.Edit.__init__(self, allow_tab = False)
         self.history = deque(maxlen=1000)
         self._history_index = -1
         self._got_focus = got_focus
@@ -243,6 +252,11 @@ class Commander(urwid.Frame):
         self._hook_stdout = hook_stdout
         self._hook_stderr = hook_stderr
 
+
+        # Used to keep the old out streams
+        self._old_stdout = None
+        self._old_stderr = None
+
         self.header = urwid.AttrWrap(urwid.Text(title), 'inactive_title')
         self.foot = urwid.AttrMap(urwid.Text(command_caption), 'active_title')
 
@@ -277,7 +291,11 @@ class Commander(urwid.Frame):
 
         self._hookToStdOutput(hookToStdOut = self._hook_stdout, hookToStdErr = self._hook_stderr)
 
-        self.eloop.run()
+        try:
+            self.eloop.run()
+        except Exception as e:
+            self._hookToStdOutput(hookToStdOut = False, hookToStdErr = False)
+            print(traceback.format_exc())
 
     def on_line_entered(self, line):
         if self._cmd:
@@ -355,6 +373,26 @@ class Commander(urwid.Frame):
 
     def _hookToStdOutput(self, hookToStdOut=True, hookToStdErr=True):
         if hookToStdOut:
-            sys.stdout = self.getStdOutpoutStream(is_stderr=False)
+            if self._old_stdout:
+                pass
+            else:
+                self._old_stdout = sys.stdout
+                sys.stdout = self.getStdOutpoutStream(is_stderr=False)
+        else:
+            if self._old_stdout:
+                sys.stdout = self._old_stdout
+                self._old_stdout = None
+            else:
+                pass
         if hookToStdErr:
-            sys.stderr = self.getStdOutpoutStream(is_stderr=True)
+            if self._old_stderr:
+                pass
+            else:
+                self._old_stderr = sys.stderr
+                sys.stderr = self.getStdOutpoutStream(is_stderr=True)
+        else:
+            if self._old_stderr:
+                sys.stderr = self._old_stderr
+                self._old_stderr = None
+            else:
+                pass
