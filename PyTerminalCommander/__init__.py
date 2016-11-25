@@ -247,7 +247,8 @@ class Commander(urwid.Frame):
         , show_help_on_start=False
         , hook_stdout=False, hook_stderr=False
         , extra_pallete = None
-        , show_line_num = False ):
+        , show_line_num = False
+        , spaces_for_tab = 4 ):
         self._show_help_on_start = show_help_on_start
         self._hook_stdout = hook_stdout
         self._hook_stderr = hook_stderr
@@ -263,7 +264,7 @@ class Commander(urwid.Frame):
         self.model = urwid.SimpleListWalker([])
         self.inner = ListView(self.model, lambda : \
                              self._update_focus(False),
-                             max_size=max_size, show_line_num = show_line_num)
+                             max_size=max_size, show_line_num = show_line_num, tab_spaces = spaces_for_tab)
         self.popup_launcher = CommanderPopupLauncher(self.inner, self)
         self.input = Input(lambda : self._update_focus(True))
         foot = urwid.Pile([self.foot, urwid.AttrMap(self.input, 'normal')])
