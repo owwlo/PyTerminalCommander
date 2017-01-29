@@ -171,11 +171,11 @@ class Input(FocusMixin, urwid.Edit):
     def keypress(self, size, key):
         if key == 'enter':
             line = self.edit_text.strip()
+            self.edit_text = u''
             if line:
                 urwid.emit_signal(self, 'line_entered', line)
                 self.history.append(line)
             self._history_index = len(self.history)
-            self.edit_text = u''
         if key == 'up':
 
             self._history_index -= 1
