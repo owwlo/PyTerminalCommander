@@ -7,6 +7,7 @@ import threading
 import sys
 import os
 import traceback
+import time
 
 from PyTerminalCommander import Commander, CommandHandler, CommanderPopupLauncher
 
@@ -31,6 +32,7 @@ if __name__=='__main__':
 
         def do_green(self, commander, extra):
             '''Output the following text in green.'''
+            time.sleep(10)
             return (extra, "light_green")
 
         def do_notify(self, commander, extra):
