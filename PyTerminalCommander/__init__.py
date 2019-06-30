@@ -158,6 +158,26 @@ class ListView(FocusMixin, urwid.ListBox):
             if was_on_end:
                 self.set_focus(last, 'above')
 
+def super_move(text, position, back_forward = True, del_char = True):
+    idx_inc = -1 if back_forward else 1
+    end_pos = position - 1 if back_forward else position
+    if end_pos >= 0 and end_pos < len(text):
+        triming = False if text[end_pos].isalnum() else True
+        while(end_pos >= 0 and end_pos < len(text)
+              and (triming or text[end_pos].isalnum())):
+            if text[end_pos].isalnum():
+                triming = False
+            end_pos += idx_inc
+    if back_forward: end_pos += 1
+    end_pos = min(len(text), end_pos)
+    end_pos = max(0, end_pos)
+    position = min(len(text), position)
+    position = max(0, position)
+    if del_char:
+        text = text[:min(position, end_pos)] + text[max(position, end_pos):]
+    r_pos = end_pos if not del_char else end_pos if back_forward else position
+    return text, r_pos
+
 class Input(FocusMixin, urwid.Edit):
 
     signals = ['line_entered']
@@ -176,21 +196,32 @@ class Input(FocusMixin, urwid.Edit):
                 urwid.emit_signal(self, 'line_entered', line)
                 self.history.append(line)
             self._history_index = len(self.history)
-        if key == 'up':
+        elif key == 'up':
 
             self._history_index -= 1
             if self._history_index < 0:
                 self._history_index = 0
             else:
                 self.edit_text = self.history[self._history_index]
-        if key == 'down':
+        elif key == 'down':
             self._history_index += 1
             if self._history_index >= len(self.history):
                 self._history_index = len(self.history)
                 self.edit_text = u''
             else:
                 self.edit_text = self.history[self._history_index]
+        elif key in ["ctrl right", "ctrl left", "meta backspace"]:
+            keys = key.split(" ")
+            back_forward = False if keys[1] == "right" else True
+            del_char = True if keys[1] == "backspace" else False
+            new_text, new_pos = super_move(self.edit_text, self.edit_pos, back_forward, del_char)
+            self.set_edit_text(new_text)
+            self.set_edit_pos(new_pos)
         else:
+            if key == "ctrl a":
+                key = "home"
+            elif key == "ctrl e":
+                key = "end"
             urwid.Edit.keypress(self, size, key)
 
 class CommanderPopupLauncher(urwid.PopUpLauncher):
@@ -244,8 +275,8 @@ class Commander(urwid.Frame):
     def __init__( self, title, command_caption=DEFAULT_COMMAND_CAPTION
         , cmd_cb=None
         , max_size=2048
-        , show_help_on_start=False
-        , hook_stdout=False, hook_stderr=False
+        , show_help_on_start = False
+        , hook_stdout = False, hook_stderr = False
         , extra_pallete = None
         , show_line_num = False
         , spaces_for_tab = 4 ):
@@ -319,16 +350,17 @@ class Commander(urwid.Frame):
             else:
                 self.output(line)
 
+    def redraw(self):
+        if self.eloop and self._eloop_thread \
+            != threading.current_thread():
+            self.eloop.draw_screen()
+
     def output(self, line, style=None):
         if style and style in self._output_styles:
             line = (style, line)
         self.inner.add(line)
-
         # since output could be called asynchronously form other threads we need to refresh screen in these cases
-
-        if self.eloop and self._eloop_thread \
-            != threading.current_thread():
-            self.eloop.draw_screen()
+        self.redraw()
 
     def getStdOutpoutStream(self, is_stderr=False):
         commander = self
