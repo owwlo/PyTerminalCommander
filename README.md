@@ -10,6 +10,7 @@ A Python library to provide a divided GUI layout in terminal as an easy way to b
 - Popup Support
 - Simple interface for easily integrating with any script
 - Customizable theme, overwritable palette
+- [v0.0.6] Move cursor fast using Ctrl+[Left/Right]; backspace the whole word by holding Ctrl
 
 ## Demo
 

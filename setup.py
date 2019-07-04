@@ -19,7 +19,7 @@ try:
 except (IOError, ImportError):
     pass
 
-VERSION = "0.0.5"
+VERSION = "0.0.6"
 
 setup(
     name='PyTerminalCommander',
@@ -50,7 +50,7 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
@@ -68,6 +68,7 @@ setup(
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ],
 
     # What does your project relate to?
