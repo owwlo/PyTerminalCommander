@@ -138,25 +138,43 @@ class ListView(FocusMixin, urwid.ListBox):
         self.show_line_num = show_line_num
         self.tab_spaces = tab_spaces
 
-    def add(self, line):
+    def get(self, line_idx):
+        with self._lock:
+            if line_idx >= len(self.body) or line_idx < 0:
+                return None
+            return self.body[line_idx]
+
+    def _prep_line(self, line):
         if isinstance(line, six.string_types):
             line = line.replace("\t", " " * self.tab_spaces)
         elif isinstance(line, tuple):
             line = (line[0], line[1].replace("\t", " " * self.tab_spaces))
+        return line
 
-        self._line_counter += 1
+    def add_or_update(self, line, line_idx = None):
+        line = self._prep_line(line)
+        if line_idx is not None and self.get(line_idx) is None:
+            return False
+        if line_idx is None:
+            line_idx = self._line_counter
+            self._line_counter += 1
         with self._lock:
             was_on_end = self.get_focus()[1] == len(self.body) - 1
             if self.max_size and len(self.body) > self.max_size:
                 del self.body[0]
             if self.show_line_num:
-                line = urwid.Columns([(4, urwid.Text(str(self._line_counter))),  urwid.Text(line)])
+                line_num_str = str(line_idx + 1)
+                line_num_width = max(3, len(line_num_str)) + 1
+                line = urwid.Columns([(line_num_width, urwid.Text(line_num_str)),  urwid.Text(line)])
             else:
                 line = urwid.Text(line)
-            self.body.append(line)
-            last = len(self.body) - 1
+            if line_idx >= len(self.body):
+                self.body.append(line)
+            else:
+                self.body[line_idx] = line
             if was_on_end:
-                self.set_focus(last, 'above')
+                self.set_focus(len(self.body) - 1, 'above')
+            return line_idx
 
 def super_move(text, position, back_forward = True, del_char = True):
     idx_inc = -1 if back_forward else 1
@@ -355,12 +373,16 @@ class Commander(urwid.Frame):
             != threading.current_thread():
             self.eloop.draw_screen()
 
-    def output(self, line, style=None):
+    def output(self, line, style=None, line_idx=None):
         if style and style in self._output_styles:
             line = (style, line)
-        self.inner.add(line)
+        line_idx = self.inner.add_or_update(line, line_idx=line_idx)
         # since output could be called asynchronously form other threads we need to refresh screen in these cases
         self.redraw()
+        return line_idx
+
+    def get_output(self, line_idx):
+        return self.inner.get(line_idx)
 
     def getStdOutpoutStream(self, is_stderr=False):
         commander = self

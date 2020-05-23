@@ -56,12 +56,28 @@ if __name__=='__main__':
 
     # Print things from another thread
     import time
-    def run():
+    def run_tick():
         while True:
             time.sleep(1)
             c.output('Tick')
-    t = Thread(target = run)
-    t.daemon=True
-    t.start()
+    t_tick = Thread(target = run_tick)
+    t_tick.daemon=True
+    t_tick.start()
+
+    from tabulate import tabulate
+    import random
+    def run_fixed_table():
+        idx_token = None
+        while True:
+            time.sleep(.4)
+            table_str = tabulate([
+                ["Items", "Values"],
+                ["decimal", random.random()],
+                ["string", "I am a {}string.".format("long " * random.randint(1, 10))]
+            ], headers="firstrow", tablefmt="grid")
+            idx_token = c.output(table_str, line_idx=idx_token)
+    t_fixed_table = Thread(target = run_fixed_table)
+    t_fixed_table.daemon=True
+    t_fixed_table.start()
 
     c.loop()
