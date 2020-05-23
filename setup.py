@@ -10,16 +10,16 @@ from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
-import pypandoc
 
 long_description = 'A Python library to provide a divided GUI layout in terminal as an easy way to build any command-output separated application.'
 
 try:
+    import pypandoc
     long_description = pypandoc.convert('README.md', 'rst')
 except (IOError, ImportError):
-    pass
+    print("Did you forget install pypandoc?")
 
-VERSION = "0.0.7.1"
+VERSION = "0.0.7.2"
 
 setup(
     name='PyTerminalCommander',
